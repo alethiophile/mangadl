@@ -1,6 +1,6 @@
 #!python3
 
-import urllib.parse, re
+import re
 from pprint import pprint
 from .util import sessionget
 import datetime as dt
@@ -24,17 +24,19 @@ class Mangadex:
             raise RuntimeError(f"request for {r.url} returned {r.status_code}")
         ro = r.json()
 
-        # pprint(ro)
+        pprint(ro)
 
         manga_title = ro['data']['attributes']['title']['en']
 
-        r = await sessionget(f"{api_url}/manga/{manga_id}/feed?"
-                             "translatedLanguage[]=en&order[volume]=asc&"
-                             "order[chapter]=asc")
+        r = await sessionget(
+            f"{api_url}/manga/{manga_id}/feed?translatedLanguage[]=en&"
+            "order[volume]=asc&order[chapter]=asc&contentRating[]=safe&"
+            "contentRating[]=suggestive&contentRating[]=erotica&"
+            "contentRating[]=pornographic")
         r.raise_for_status()
         co = r.json()
 
-        # pprint(co)
+        pprint(co)
         chapters = co['data']
 
         chapter_url = "https://mangadex.org/chapter/{}"

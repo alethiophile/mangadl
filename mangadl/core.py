@@ -5,6 +5,9 @@ from .batoto import Batoto
 from .mangadex import Mangadex
 from .util import to_filename, sessionget
 import click, trio, asks, urllib.parse, os, zipfile, re, qtoml, math
+from pathlib import Path
+
+from typing import Optional
 
 backend_res = [
     ( 'trashscanlations',
@@ -79,7 +82,7 @@ def num_digits(num_chapters):
         return 3
     return math.ceil(math.log10(num_chapters + 1))
 
-async def get_manifest(fn, url, language):
+async def get_manifest(fn: Optional[Path], url, language):
     print(f"Fetching manifest URL {url}")
 
     backend_name = find_backend(url)
@@ -99,9 +102,18 @@ async def get_manifest(fn, url, language):
         cl = [i for i in cl if 'language' not in i or
               i['language'] == language]
 
-    manifest_fn = (f"{title_fn}.toml" if fn is None else fn)
-    if os.path.exists(manifest_fn):
-        manifest_fn = manifest_fn + ".new"
+    if fn is not None:
+        manifest_path = Path(fn)
+    else:
+        dir_path = Path(title_fn)
+        if not dir_path.exists():
+            dir_path.mkdir(mode=0o755)
+        if not dir_path.is_dir():
+            raise RuntimeError(f"{title_fn} an existing file?")
+        manifest_path = dir_path / 'manifest.toml'
+    if manifest_path.exists():
+        new_path = manifest_path.with_name(manifest_path.name + '.old')
+        manifest_path.replace(new_path)
 
     def make_cbz_fn(ind, chapter):
         d = num_digits(num_chapters)
@@ -122,7 +134,7 @@ async def get_manifest(fn, url, language):
 
     manifest_data['chapters'] = cl
 
-    with open(manifest_fn, 'w') as out:
+    with manifest_path.open('w') as out:
         qtoml.dump(manifest_data, out, encode_none='None')
 
 async def run_download(manifest, dry_run, download_num):
@@ -157,9 +169,13 @@ async def trio_main(url, download_num, update, dry_run, language):
     inp_fn = None
     fetched_data = {}
     if os.path.exists(url):
+        p = Path(url)
         update_file = True
-        inp_fn = url
-        with open(url) as inp:
+        if p.is_dir():
+            inp_fn = p / 'manifest.toml'
+        else:
+            inp_fn = p
+        with inp_fn.open() as inp:
             fetched_data = qtoml.load(inp)
 
     if (not update_file) or update:
@@ -169,6 +185,8 @@ async def trio_main(url, download_num, update, dry_run, language):
         real_url = (fetched_data['url'] if update_file else url)
         await get_manifest(inp_fn, real_url, real_language)
     else:
+        if p.is_dir():
+            os.chdir(p)
         await run_download(fetched_data, dry_run, download_num)
 
 @click.command()
