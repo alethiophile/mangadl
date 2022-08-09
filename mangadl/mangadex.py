@@ -5,11 +5,11 @@ from pprint import pprint
 from .util import sessionget
 import datetime as dt
 
-api_url = "https://mangadex.org/api/"
+api_url = "https://api.mangadex.org"
 data_url = "{}{}/{}"
 
-title_re = re.compile(r"^https://mangadex.org/title/(\d+)/")
-chapter_re = re.compile(r"^https://mangadex.org/chapter/(\d+)")
+title_re = re.compile(r"^https://mangadex.org/title/([0-9a-f-]+)/")
+chapter_re = re.compile(r"^https://mangadex.org/chapter/([0-9a-f-]+)")
 
 class Mangadex:
     async def get_chapters(self, url):
@@ -19,31 +19,37 @@ class Mangadex:
 
         manga_id = o.group(1)
 
-        r = await sessionget(api_url, params={'id': manga_id, 'type': 'manga'})
+        r = await sessionget(f"{api_url}/manga/{manga_id}")
         if r.status_code >= 400:
             raise RuntimeError(f"request for {r.url} returned {r.status_code}")
         ro = r.json()
 
         # pprint(ro)
 
-        manga_title = ro['manga']['title']
-        chapters = [i for i in sorted(ro['chapter'].keys(), key=int)]
+        manga_title = ro['data']['attributes']['title']['en']
+
+        r = await sessionget(f"{api_url}/manga/{manga_id}/feed?"
+                             "translatedLanguage[]=en&order[volume]=asc&"
+                             "order[chapter]=asc")
+        r.raise_for_status()
+        co = r.json()
+
+        # pprint(co)
+        chapters = co['data']
 
         chapter_url = "https://mangadex.org/chapter/{}"
 
         rv = []
-        for i in chapters:
-            e = ro['chapter'][i]
-            # pprint(e)
-            ctitle = f"Ch. {e['chapter']}" + (f": {e['title']}" if e['title']
+        for ch in chapters:
+            e = ch['attributes']
+            ctitle = f"Ch. {e['chapter']}" + (f" — {e['title']}" if e['title']
                                               else '')
             d = {
-                'title': ctitle, 'url': chapter_url.format(i), 'id': i,
-                'language': e['lang_code'], 'translator': e['group_name'],
+                'title': ctitle, 'url': chapter_url.format(ch['id']),
+                'id': ch['id'], 'language': e['translatedLanguage'],
                 'volume': int(e['volume'] if e['volume'] else 0),
                 'chapter': float(e['chapter'] if e['chapter'] else 0),
-                'date': dt.datetime.fromtimestamp(e['timestamp'],
-                                                  dt.timezone.utc),
+                'date': dt.datetime.fromisoformat(e['updatedAt'])
             }
             rv.append(d)
 
@@ -108,16 +114,16 @@ class Mangadex:
 
         chapter_id = o.group(1)
 
-        r = await sessionget(api_url,
-                             params={'id': chapter_id, 'type': 'chapter'})
+        r = await sessionget(f"{api_url}/at-home/server/{chapter_id}")
         if r.status_code >= 400:
             raise RuntimeError(f"request for {r.url} returned {r.status_code}")
         ro = r.json()
-        # print(ro)
 
-        def make_img_url(ro, i):
-            u = data_url.format(ro['server'], ro['hash'], i)
-            return urllib.parse.urljoin(url, u)
+        bu = ro['baseUrl']
+        hv = ro['chapter']['hash']
 
-        rv = [make_img_url(ro, i) for i in ro['page_array']]
+        def make_img_url(i):
+            return f"{bu}/data/{hv}/{i}"
+
+        rv = [make_img_url(i) for i in ro['chapter']['data']]
         return rv
