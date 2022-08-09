@@ -2,6 +2,7 @@
 
 from .trashscanlations import TrashScanlations
 from .batoto import Batoto
+from .mangadex import Mangadex
 from .util import to_filename, sessionget
 import click, trio, asks, urllib.parse, os, zipfile, re, qtoml
 
@@ -10,11 +11,14 @@ backend_res = [
       re.compile("^https://trashscanlations.com/")),
     ( 'batoto',
       re.compile("^https://bato.to/")),
+    ( 'mangadex',
+      re.compile("^https://mangadex.org/")),
 ]
 
 backend_objs = {
     'trashscanlations': TrashScanlations,
     'batoto': Batoto,
+    'mangadex': Mangadex,
 }
 
 def find_backend(url):
