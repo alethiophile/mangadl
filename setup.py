@@ -16,8 +16,13 @@ setup(
     license='MIT',
     packages=['mangadl'],
     # url="https://github.com/alethiophile/qtoml",
-    install_requires=['click'],
-    python_requires='~=3.6',
+    install_requires=['click', 'trio', 'asks'],
+    python_requires='~=3.7.1',
+    entry_points={
+        'console_scripts': [
+            'mangadl = mangadl.core:main',
+        ],
+    },
     # classifiers=(
     #     "Programming Language :: Python :: 3",
     #     "Operating System :: OS Independent",

@@ -1,25 +1,20 @@
 #!/usr/bin/python3
 
-import urllib.request, re, gzip
+import re, asks
 from bs4 import BeautifulSoup
 
-def do_request(url, referer=None):
-    hd = {"User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:21.0) Gecko/20100101 Firefox/21.0"}
-    if referer:
-        hd['Referer'] = referer
-    req = urllib.request.Request(url, headers=hd)
-    return urllib.request.urlopen(req)
+web_session = None
 
-def tosoup(url):
-    #print(url)
-    r = do_request(url)
-    #print(r.getheaders())
-    re = r.getheader('Content-Type')
-    re = re[re.index('charset=')+8:]
-    a = r.read()
-    if r.getheader('Content-Encoding') == 'gzip':
-        a = gzip.decompress(a)
-    return BeautifulSoup(a, 'html5lib', from_encoding=re)
+async def sessionget(url):
+    global web_session
+    if web_session is None:
+        web_session = asks.Session(connections=5)
+    return await web_session.get(url)
+
+async def tosoup(url):
+    r = await sessionget(url)
+    soup = BeautifulSoup(r.text, 'html5lib')
+    return soup
 
 def to_filename(title):
     title = title.lower().replace(" ", ".")
